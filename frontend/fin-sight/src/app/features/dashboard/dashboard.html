@@ -1,0 +1,259 @@
+@if (loading()) {
+  <app-loading message="Crunching your numbers…" />
+} @else {
+  @if (!hasData()) {
+    <div class="card">
+      <app-empty-state
+        title="No data for this period"
+        message="There are no transactions for the selected filters. Import a bank CSV file or add a transaction manually to see your analytics."
+        actionLabel="Import CSV"
+        actionLink="/import"
+      />
+    </div>
+  }
+
+  <section class="stat-grid" aria-label="Financial summary">
+    <app-stat-card
+      label="Total income"
+      [value]="formatCurrency(summary()?.totalIncome)"
+      accent="#34d399"
+      valueClass="text-income"
+      [delta]="summary()?.previousPeriod?.hasComparison ? formatPercent(summary()?.previousPeriod?.incomeDelta?.percentChange ?? null) : null"
+      [deltaClass]="incomeDeltaClass()"
+      footnote="vs previous period"
+    />
+    <app-stat-card
+      label="Total expenses"
+      [value]="formatCurrency(summary()?.totalExpenses)"
+      accent="#fb7185"
+      valueClass="text-expense"
+      [delta]="summary()?.previousPeriod?.hasComparison ? formatPercent(summary()?.previousPeriod?.expenseDelta?.percentChange ?? null) : null"
+      [deltaClass]="expenseDeltaClass()"
+      footnote="vs previous period"
+    />
+    <app-stat-card
+      label="Net balance"
+      [value]="formatSignedCurrency(summary()?.netBalance ?? 0)"
+      [accent]="(summary()?.netBalance ?? 0) >= 0 ? '#22d3ee' : '#fb7185'"
+      [valueClass]="(summary()?.netBalance ?? 0) >= 0 ? 'text-income' : 'text-expense'"
+      footnote="income minus expenses"
+    />
+    <app-stat-card
+      label="Monthly average expense"
+      [value]="formatCurrency(summary()?.averageMonthlyExpense)"
+      accent="#a78bfa"
+      footnote="{{ summary()?.monthsInPeriod ?? 0 }} month(s) in period"
+    />
+    <app-stat-card
+      label="Daily average expense"
+      [value]="formatCurrency(summary()?.averageDailyExpense)"
+      accent="#3b82f6"
+      footnote="{{ summary()?.daysInPeriod ?? 0 }} days in period"
+    />
+    <app-stat-card
+      label="Largest single expense"
+      [value]="formatCurrency(topExpenses()[0]?.amount)"
+      accent="#fbbf24"
+      footnote="{{ topExpenses()[0]?.description ?? '—' }}"
+    />
+    <app-stat-card
+      label="Transactions"
+      [value]="formatNumber(summary()?.transactionCount)"
+      accent="#22d3ee"
+      footnote="{{ summary()?.incomeCount ?? 0 }} income · {{ summary()?.expenseCount ?? 0 }} expenses"
+    />
+    @if (summary()?.budgetUsage?.hasBudgets) {
+      <app-stat-card
+        label="Budget used"
+        [value]="formatPercent(summary()?.budgetUsage?.usedPercent ?? 0, 0)"
+        accent="#a78bfa"
+        [progress]="summary()?.budgetUsage?.usedPercent ?? 0"
+        footnote="of {{ formatCurrency(summary()?.budgetUsage?.totalLimit) }}"
+      />
+    }
+  </section>
+
+  @if (hasData()) {
+    <section class="chart-grid">
+      <div class="card chart-card span-7">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Income vs expenses</div>
+            <div class="card-subtitle">Monthly evolution</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <app-chart
+            type="line"
+            [data]="trendChart()"
+            [options]="trendOptions"
+            ariaLabel="Income versus expenses by month"
+          />
+        </div>
+      </div>
+
+      <div class="card chart-card span-5">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Expenses by category</div>
+            <div class="card-subtitle">Share of total spending</div>
+          </div>
+        </div>
+        <div class="card-body">
+          @if (breakdown().length) {
+            <app-chart
+              type="doughnut"
+              [data]="categoryChart()"
+              [options]="doughnutOptions"
+              ariaLabel="Expenses by category"
+            />
+          } @else {
+            <app-empty-state
+              title="No expenses in this period"
+              message="Expenses will appear here once you record them."
+            />
+          }
+        </div>
+      </div>
+
+      <div class="card chart-card span-7">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Monthly expenses</div>
+            <div class="card-subtitle">Spending and net balance per month</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <app-chart
+            type="bar"
+            [data]="monthlyExpenseChart()"
+            [options]="barOptions"
+            ariaLabel="Monthly expenses and net balance"
+          />
+        </div>
+      </div>
+
+      <div class="card chart-card span-5">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Spending by weekday</div>
+            <div class="card-subtitle">Average per occurrence</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <app-chart
+            type="bar"
+            [data]="weekdayChart()"
+            [options]="barOptions"
+            ariaLabel="Average spending per weekday"
+          />
+        </div>
+      </div>
+
+      <div class="card span-7">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Insights</div>
+            <div class="card-subtitle">Calculated facts and detected patterns</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="insight-list">
+            @for (insight of insights(); track insight.kind) {
+              <article class="insight">
+                <div class="insight-icon {{ severityLabels[insight.severity] }}">
+                  @switch (insight.severity) {
+                    @case ('Positive') {
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>
+                    }
+                    @case ('Warning') {
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4m0 4h.01"/><path d="M10.3 3.9 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+                    }
+                    @case ('Danger') {
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5m0 3h.01"/></svg>
+                    }
+                    @default {
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/></svg>
+                    }
+                  }
+                </div>
+                <div>
+                  <div class="insight-title">
+                    {{ insight.title }}
+                    @if (insight.isPattern) {
+                      <span class="tag pattern">possible pattern</span>
+                    }
+                  </div>
+                  <p class="insight-text">{{ insight.description }}</p>
+                </div>
+              </article>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="card span-5">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Largest expenses</div>
+            <div class="card-subtitle">Top transactions in the period</div>
+          </div>
+        </div>
+        <div class="card-body">
+          @if (topExpenses().length) {
+            <app-chart
+              type="bar"
+              [data]="topExpenseChart()"
+              [options]="barOptions"
+              ariaLabel="Largest expenses"
+              [tall]="false"
+            />
+          } @else {
+            <app-empty-state title="No expenses yet" message="Your largest expenses will show here." />
+          }
+        </div>
+      </div>
+
+      <div class="card span-12">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Recent transactions</div>
+            <div class="card-subtitle">Latest recorded movements</div>
+          </div>
+          <a class="btn btn-sm" routerLink="/transactions">View all</a>
+        </div>
+        <div class="card-body">
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Description</th>
+                  <th>Category</th>
+                  <th class="num">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (transaction of recent(); track transaction.id) {
+                  <tr>
+                    <td class="text-muted">{{ formatDate(transaction.date) }}</td>
+                    <td>{{ transaction.description }}</td>
+                    <td>
+                      <span class="tag"><span class="dot" [style.background]="transaction.categoryColor"></span>{{ transaction.categoryName }}</span>
+                    </td>
+                    <td class="num" [class]="transaction.type === 'Income' ? 'text-income' : 'text-expense'">
+                      {{ transaction.type === 'Income' ? '+' : '-' }}{{ formatCurrency(transaction.amount) }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  }
+}
+
+
+

@@ -1,0 +1,127 @@
+<div class="row between" style="margin-bottom: 4px">
+  <div>
+    <h2 style="font-size: 20px">Categories</h2>
+    <p class="text-faint" style="font-size: 13px">
+      Organise transactions with categories and colours used across charts.
+    </p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">{{ editingId() ? 'Edit category' : 'New category' }}</div>
+  </div>
+  <div class="card-body">
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="form-grid">
+        <div class="field">
+          <label for="cat-name">Name</label>
+          <input id="cat-name" class="input" type="text" formControlName="name" placeholder="e.g. Housing" />
+          @if (form.controls.name.touched && form.controls.name.invalid) {
+            <span class="field-error">The name is required (max 80 characters).</span>
+          }
+        </div>
+
+        <div class="field">
+          <label for="cat-applies">Used for</label>
+          <select id="cat-applies" class="select" formControlName="appliesTo">
+            <option value="Both">Income &amp; expenses</option>
+            <option value="Expense">Expenses only</option>
+            <option value="Income">Income only</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="cat-color">Colour</label>
+          <div class="row" id="cat-color">
+            <input type="color" formControlName="color" aria-label="Category colour" />
+            @for (color of palette; track color) {
+              <button
+                type="button"
+                class="dot"
+                style="width: 22px; height: 22px; border: 2px solid transparent; cursor: pointer; padding: 0"
+                [style.background]="color"
+                [style.border-color]="form.controls.color.value === color ? '#fff' : 'transparent'"
+                [attr.aria-label]="'Use colour ' + color"
+                (click)="form.controls.color.setValue(color)"
+              ></button>
+            }
+          </div>
+        </div>
+
+        <label class="row" style="align-self: end; cursor: pointer">
+          <input type="checkbox" formControlName="isArchived" />
+          <span>Archived</span>
+        </label>
+      </div>
+
+      <div class="row" style="margin-top: 16px">
+        <button class="btn btn-primary" type="submit" [disabled]="form.invalid">
+          {{ editingId() ? 'Save changes' : 'Create category' }}
+        </button>
+        @if (editingId()) {
+          <button class="btn btn-ghost" type="button" (click)="cancelEdit()">Cancel</button>
+        }
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">All categories</div>
+    <div class="card-subtitle">{{ categories().length }} category(ies)</div>
+  </div>
+  <div class="card-body">
+    @if (loading()) {
+      <p class="text-muted">Loading…</p>
+    } @else {
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Colour</th>
+              <th>Name</th>
+              <th>Used for</th>
+              <th>Transactions</th>
+              <th>Status</th>
+              <th aria-label="Actions"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (category of sorted(); track category.id) {
+              <tr>
+                <td><span class="dot" [style.background]="category.color" style="width: 14px; height: 14px"></span></td>
+                <td>
+                  <div style="font-weight: 600">{{ category.name }}</div>
+                  @if (category.isDemo) {
+                    <span class="tag pattern" style="margin-top: 4px">demo</span>
+                  }
+                </td>
+                <td class="text-muted">{{ appliesToLabels[category.appliesTo] }}</td>
+                <td class="text-muted">{{ usageCount(category.id) }}</td>
+                <td>
+                  @if (category.isArchived) {
+                    <span class="tag warning">archived</span>
+                  } @else {
+                    <span class="tag ok">active</span>
+                  }
+                </td>
+                <td>
+                  <div class="row" style="gap: 2px; justify-content: flex-end">
+                    <button class="icon-btn" type="button" aria-label="Edit category" (click)="edit(category)">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m18.4 5.6-9.5 9.5-3.8 1 1-3.8 9.5-9.5a1.9 1.9 0 0 1 2.7 0l.1.1a1.9 1.9 0 0 1 0 2.7Z"/></svg>
+                    </button>
+                    <button class="icon-btn" type="button" aria-label="Delete category" (click)="remove(category)">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-8 0 1 12a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-12"/></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>

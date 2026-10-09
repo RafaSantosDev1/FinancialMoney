@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: finsight-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${FINSIGHT_DB_NAME:-finsight}
+      POSTGRES_USER: ${FINSIGHT_DB_USER:-finsight}
+      POSTGRES_PASSWORD: ${FINSIGHT_DB_PASSWORD:-finsight}
+    ports:
+      - "${FINSIGHT_DB_PORT:-5432}:5432"
+    volumes:
+      - finsight-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  finsight-data:

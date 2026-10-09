@@ -1,0 +1,197 @@
+<div class="shell">
+  <aside class="sidebar" [class.open]="sidebarOpen()">
+    <div class="brand">
+      <div class="brand-mark">FS</div>
+      <div>
+        <div class="brand-name">FinSight</div>
+        <div class="brand-sub">Finance analytics</div>
+      </div>
+    </div>
+
+    <nav class="nav" aria-label="Main navigation">
+      <span class="nav-label">Menu</span>
+      @for (item of navItems; track item.path) {
+        <a
+          class="nav-item"
+          [routerLink]="item.path"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: item.path === '/dashboard' }"
+        >
+          @switch (item.icon) {
+            @case ('grid') {
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+            }
+            @case ('list') {
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>
+            }
+            @case ('upload') {
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4m0 0L8 8m4-4 4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+            }
+            @case ('tag') {
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.6 13.4 12 22l-9-9 8.6-8.6a2 2 0 0 1 1.4-.6H20a2 2 0 0 1 2 2v6.2a2 2 0 0 1-.6 1.4Z"/><circle cx="17" cy="7" r="1.4"/></svg>
+            }
+            @case ('target') {
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/></svg>
+            }
+            @case ('chart') {
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10m5 10V4m5 16v-7m5 7V7"/></svg>
+            }
+          }
+          <span>{{ item.label }}</span>
+        </a>
+      }
+    </nav>
+
+    <div class="sidebar-footer">
+      @if (demoActive()) {
+        <div class="demo-banner" role="status">
+          <strong>Demo data active</strong>
+          <span>{{ demoTransactions() }} demo transactions are loaded.</span>
+          <button class="btn btn-sm btn-ghost" type="button" (click)="removeDemoData()">
+            Remove demo data
+          </button>
+        </div>
+      }
+      <a class="nav-item" routerLink="/import">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4v12m0 0 4-4m-4 4-4-4"/><path d="M4 20h16"/></svg>
+        <span>Import new file</span>
+      </a>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button
+        class="icon-btn menu-toggle"
+        type="button"
+        (click)="toggleSidebar()"
+        aria-label="Toggle navigation"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+
+      <div>
+        <div class="topbar-title">Personal Finance Analytics</div>
+        <div class="topbar-sub">{{ filters.label() }}</div>
+      </div>
+
+      <div class="topbar-actions">
+        <label class="sr-only" for="period">Period</label>
+        <select
+          id="period"
+          class="select"
+          style="width: auto"
+          [value]="filters.period()"
+          (change)="onPeriodChange($any($event.target).value)"
+        >
+          <option value="thisMonth">This month</option>
+          <option value="lastMonth">Last month</option>
+          <option value="last3">Last 3 months</option>
+          <option value="last6">Last 6 months</option>
+          <option value="thisYear">This year</option>
+          <option value="custom">Custom range</option>
+        </select>
+
+        @if (customOpen()) {
+          <input
+            class="input"
+            style="width: auto"
+            type="date"
+            aria-label="Start date"
+            [value]="filters.customFrom()"
+            (change)="onCustomRange($any($event.target).value, filters.customTo())"
+          />
+          <input
+            class="input"
+            style="width: auto"
+            type="date"
+            aria-label="End date"
+            [value]="filters.customTo()"
+            (change)="onCustomRange(filters.customFrom(), $any($event.target).value)"
+          />
+        }
+
+        <button class="btn btn-sm" type="button" (click)="toggleFilterPanel()" aria-expanded="{{ filterPanelOpen() }}">
+          Filters
+          @if (selectedCategories().length || filters.type() !== null || filters.accountId() !== null || filters.search()) {
+            <span class="tag info">on</span>
+          }
+        </button>
+      </div>
+    </header>
+
+    @if (filterPanelOpen()) {
+      <div class="filter-panel card">
+        <div class="form-grid">
+          <div class="field">
+            <label for="filter-type">Transaction type</label>
+            <select
+              id="filter-type"
+              class="select"
+              [value]="filters.type() ?? ''"
+              (change)="onTypeChange($any($event.target).value)"
+            >
+              <option value="">All</option>
+              <option [value]="0">Income</option>
+              <option [value]="1">Expense</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="filter-account">Account</label>
+            <select
+              id="filter-account"
+              class="select"
+              [value]="filters.accountId() ?? ''"
+              (change)="onAccountChange($any($event.target).value)"
+            >
+              <option value="">All accounts</option>
+              @for (account of accounts(); track account.id) {
+                <option [value]="account.id">{{ account.name }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="filter-search">Search description</label>
+            <input
+              id="filter-search"
+              class="input"
+              type="search"
+              placeholder="e.g. supermarket"
+              [value]="filters.search()"
+              (input)="filters.setSearch($any($event.target).value)"
+            />
+          </div>
+        </div>
+
+        <div class="row" style="margin-top: 14px">
+          <span class="card-subtitle">Categories</span>
+          @for (category of categories(); track category.id) {
+            <button
+              class="chip"
+              type="button"
+              [class.active]="filters.categoryIds().includes(category.id)"
+              (click)="toggleCategory(category.id)"
+            >
+              <span class="dot" [style.background]="category.color"></span>
+              {{ category.name }}
+            </button>
+          }
+        </div>
+
+        <div class="row" style="margin-top: 14px">
+          <button class="btn btn-sm btn-ghost" type="button" (click)="clearFilters()">
+            Clear all filters
+          </button>
+        </div>
+      </div>
+    }
+
+    <main class="content">
+      <router-outlet />
+    </main>
+  </div>
+</div>
+
+<app-toast-host />

@@ -1,0 +1,141 @@
+<div class="row between" style="margin-bottom: 4px">
+  <div>
+    <h2 style="font-size: 20px">Budgets</h2>
+    <p class="text-faint" style="font-size: 13px">
+      Define monthly limits and track spending against them. Limits never change transactions.
+    </p>
+  </div>
+  <div class="row">
+    <div class="field">
+      <label class="sr-only" for="budget-month">Month</label>
+      <select id="budget-month" class="select" style="width: auto" [value]="month()" (change)="onMonthChange($any($event.target).value)">
+        @for (option of monthOptions; track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+        }
+      </select>
+    </div>
+    <div class="field">
+      <label class="sr-only" for="budget-year">Year</label>
+      <input id="budget-year" class="input" style="width: 110px" type="number" min="2000" max="2100" [value]="year()" (change)="onYearChange($any($event.target).value)" />
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div>
+      <div class="card-title">Global monthly budget</div>
+      <div class="card-subtitle">Applies to all expenses of the month</div>
+    </div>
+    @if (globalBudget()) {
+      <button class="btn btn-sm" type="button" (click)="editingGlobal.set(!editingGlobal())">
+        {{ editingGlobal() ? 'Close' : 'Edit limit' }}
+      </button>
+    }
+  </div>
+  <div class="card-body">
+    @if (loading()) {
+      <p class="text-muted">Loading budgets…</p>
+    } @else if (globalStatus(); as global) {
+      <div class="col">
+        <div class="row between">
+          <div>
+            <div class="stat-label">Spent</div>
+            <div class="stat-value text-expense">{{ formatCurrency(global.spentAmount) }}</div>
+          </div>
+          <div style="text-align: right">
+            <div class="stat-label">Limit</div>
+            <div class="stat-value">{{ formatCurrency(global.limitAmount) }}</div>
+          </div>
+        </div>
+        <div class="progress" style="height: 10px">
+          <div class="progress-fill" [style.width.%]="Math.min(global.spentPercent, 100)" [style.background]="healthColor(global.health)"></div>
+        </div>
+        <div class="row between">
+          <span class="text-muted" style="font-size: 13px">
+            {{ formatPercent(global.spentPercent, 0) }} used ·
+            {{ global.remainingAmount >= 0 ? formatCurrency(global.remainingAmount) + ' left' : formatCurrency(Math.abs(global.remainingAmount)) + ' over' }}
+          </span>
+          <span class="tag {{ healthClass(global.health) }}">{{ global.health === 'Exceeded' ? 'Limit exceeded' : global.health === 'Warning' ? 'Close to limit' : 'On track' }}</span>
+        </div>
+      </div>
+    } @else {
+      <p class="text-muted">No global budget for this month yet. Create one below.</p>
+    }
+
+    @if (!globalBudget() || editingGlobal()) {
+      <form [formGroup]="globalForm" (ngSubmit)="saveGlobal()" class="row" style="margin-top: 16px; align-items: end">
+        <div class="field">
+          <label for="global-limit">Monthly limit (EUR)</label>
+          <input id="global-limit" class="input" style="width: 180px" type="number" min="0" step="0.01" formControlName="limitAmount" />
+        </div>
+        <button class="btn btn-primary" type="submit" [disabled]="globalForm.invalid">
+          {{ globalBudget() ? 'Update limit' : 'Create global budget' }}
+        </button>
+        @if (globalBudget()) {
+          <button class="btn btn-ghost" type="button" (click)="editingGlobal.set(false)">Cancel</button>
+        }
+      </form>
+    }
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div>
+      <div class="card-title">Category budgets</div>
+      <div class="card-subtitle">Spending per category for the selected month</div>
+    </div>
+  </div>
+  <div class="card-body col">
+    @if (categoryStatus().length === 0 && withoutBudget().length === 0) {
+      <p class="text-muted">No categories available. Create categories first.</p>
+    }
+
+    @for (budget of categoryStatus(); track budget.categoryId) {
+      <div class="row between">
+        <div class="row">
+          <span class="dot" [style.background]="budget.categoryColor ?? '#38bdf8'"></span>
+          <div>
+            <div style="font-weight: 600">{{ budget.categoryName }}</div>
+            <div class="text-faint" style="font-size: 12.5px">
+              {{ formatCurrency(budget.spentAmount) }} of {{ formatCurrency(budget.limitAmount) }} ·
+              {{ formatPercent(budget.spentPercent, 0) }}
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <span class="tag {{ healthClass(budget.health) }}">
+            {{ budget.health === 'Exceeded' ? 'Exceeded' : budget.health === 'Warning' ? 'Close to limit' : budget.health === 'NoLimit' ? 'No limit' : 'On track' }}
+          </span>
+          <div class="progress" style="width: 140px">
+            <div class="progress-fill" [style.width.%]="Math.min(budget.spentPercent, 100)" [style.background]="healthColor(budget.health)"></div>
+          </div>
+          <form [formGroup]="categoryForm(budget.categoryId!)" (ngSubmit)="saveCategoryById(budget)" class="row" style="gap: 6px">
+            <input class="input" style="width: 110px" type="number" min="0" step="0.01" formControlName="limitAmount" [attr.aria-label]="'Limit for ' + budget.categoryName" />
+            <button class="btn btn-sm" type="submit">Save</button>
+          </form>
+          <button class="icon-btn" type="button" aria-label="Delete budget" (click)="removeBudget(budget)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-8 0 1 12a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-12"/></svg>
+          </button>
+        </div>
+      </div>
+    }
+
+    @for (category of withoutBudget(); track category.id) {
+      <div class="row between">
+        <div class="row">
+          <span class="dot" [style.background]="category.color"></span>
+          <div>
+            <div style="font-weight: 600">{{ category.name }}</div>
+            <div class="text-faint" style="font-size: 12.5px">No limit defined</div>
+          </div>
+        </div>
+        <form [formGroup]="categoryForm(category.id)" (ngSubmit)="saveCategory(category)" class="row" style="gap: 6px">
+          <input class="input" style="width: 110px" type="number" min="0" step="0.01" formControlName="limitAmount" [attr.aria-label]="'Limit for ' + category.name" />
+          <button class="btn btn-sm btn-primary" type="submit">Add limit</button>
+        </form>
+      </div>
+    }
+  </div>
+</div>

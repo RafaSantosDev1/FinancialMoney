@@ -1,0 +1,13 @@
+.card-header {
+  flex-wrap: wrap;
+}
+
+input[type='color'] {
+  width: 38px;
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  padding: 2px;
+  cursor: pointer;
+}

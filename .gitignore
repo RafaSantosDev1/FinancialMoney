@@ -1,0 +1,60 @@
+# ---- Secrets & local environment (never commit real credentials) ----
+.env
+.env.*
+.env.local
+*.env
+!.env.example
+
+# ---- .NET / ASP.NET Core ----
+bin/
+obj/
+*.user
+*.suo
+*.userosscr
+*.sln.docstates
+.vs/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+TestResults/
+*.nupkg
+*.snupkg
+publish/
+out/
+
+# ---- Node / Angular ----
+node_modules/
+dist/
+tmp/
+out-tsc/
+bazel-out/
+.angular/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# ---- IDEs & editors ----
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+*.swp
+*.swo
+*~
+
+# ---- OS files ----
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# ---- Logs & runtime ----
+*.log
+logs/
+*.pid
+*.seed

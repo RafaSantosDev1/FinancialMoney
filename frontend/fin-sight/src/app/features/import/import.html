@@ -1,0 +1,386 @@
+<div class="row between" style="margin-bottom: 4px">
+  <div>
+    <h2 style="font-size: 20px">Import CSV</h2>
+    <p class="text-faint" style="font-size: 13px">
+      Upload a bank or spreadsheet export, map the columns and confirm the import.
+    </p>
+  </div>
+</div>
+
+@if (step() === 'select') {
+  <div
+    class="dropzone"
+    [class.dragging]="dragging()"
+    tabindex="0"
+    role="button"
+    aria-label="Select or drop a CSV file"
+    (click)="openFilePicker()"
+    (keydown.enter)="openFilePicker()"
+    (drop)="onDrop($event)"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave()"
+  >
+    <div class="dropzone-icon">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4m0 0L8 8m4-4 4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+    </div>
+    <div style="font-weight: 650">Drop your CSV file here or click to browse</div>
+    <p class="text-muted" style="font-size: 13px">
+      Maximum 5 MB · up to 20,000 rows · UTF-8 with Portuguese characters is supported
+    </p>
+    <input
+      #fileInput
+      type="file"
+      accept=".csv,text/csv"
+      hidden
+      (change)="onFileSelected($event)"
+    />
+  </div>
+
+  @if (fileError()) {
+    <div class="card" style="border-color: rgba(251, 113, 133, 0.4); margin-top: 16px">
+      <div class="card-body row">
+        <span class="tag danger">Error</span>
+        <span>{{ fileError() }}</span>
+      </div>
+    </div>
+  }
+
+  @if (fileName()) {
+    <div class="card" style="margin-top: 16px">
+      <div class="card-header">
+        <div>
+          <div class="card-title">File options</div>
+          <div class="card-subtitle">{{ fileName() }}</div>
+        </div>
+      </div>
+      <div class="card-body col">
+        <div class="mapping-grid">
+          <div class="field">
+            <label for="delimiter">Delimiter</label>
+            <select id="delimiter" class="select" [value]="delimiter()" (change)="delimiter.set($any($event.target).value)">
+              <option value="auto">Auto-detect</option>
+              <option value=",">Comma ( , )</option>
+              <option value=";">Semicolon ( ; )</option>
+              <option value="\t">Tab</option>
+              <option value="|">Pipe ( | )</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="date-format">Date format</label>
+            <select id="date-format" class="select" [value]="dateFormat()" (change)="dateFormat.set($any($event.target).value)">
+              @for (format of dateFormats; track format) {
+                <option [value]="format">{{ format === 'auto' ? 'Auto-detect' : format }}</option>
+              }
+            </select>
+          </div>
+          <div class="field">
+            <label for="decimal">Decimal separator</label>
+            <select id="decimal" class="select" [value]="decimalSeparator()" (change)="decimalSeparator.set($any($event.target).value)">
+              <option value="auto">Auto-detect</option>
+              <option value=",">Comma ( , )</option>
+              <option value=".">Point ( . )</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="has-header">First row has headers</label>
+            <select id="has-header" class="select" [value]="hasHeader() ? 'yes' : 'no'" (change)="hasHeader.set($any($event.target).value === 'yes')">
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="default-type">Default type (if ambiguous)</label>
+            <select id="default-type" class="select" [value]="defaultType()" (change)="defaultType.set($any($event.target).value)">
+              <option value="">Ask me (abort)</option>
+              <option value="Expense">Treat all as expenses</option>
+              <option value="Income">Treat all as income</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <button class="btn btn-primary" type="button" [disabled]="previewing()" (click)="runPreview()">
+            {{ previewing() ? 'Analysing…' : 'Preview import' }}
+          </button>
+          <button class="btn btn-ghost" type="button" (click)="cancelImport()">Remove file</button>
+        </div>
+      </div>
+    </div>
+  }
+}
+
+@if (step() === 'preview' && preview(); as data) {
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Import preview</div>
+        <div class="card-subtitle">{{ fileName() }} · {{ detectedInfo() }}</div>
+      </div>
+      <div class="stat-inline">
+        <div>
+          <div class="stat-label">Valid</div>
+          <div class="stat-value text-income">{{ data.summary.validRows }}</div>
+        </div>
+        <div>
+          <div class="stat-label">Invalid</div>
+          <div class="stat-value text-expense">{{ data.summary.invalidRows }}</div>
+        </div>
+        <div>
+          <div class="stat-label">Duplicates</div>
+          <div class="stat-value" style="color: var(--amber)">{{ data.summary.duplicateRows }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-body col">
+      @if (data.warnings.length) {
+        <div class="insight" style="border-color: rgba(251, 191, 36, 0.4)">
+          <div class="insight-icon warning">!</div>
+          <div>
+            <div class="insight-title">Review the warnings</div>
+            <ul class="insight-text" style="margin: 6px 0 0; padding-left: 18px">
+              @for (warning of data.warnings; track warning) {
+                <li>{{ warning }}</li>
+              }
+            </ul>
+          </div>
+        </div>
+      }
+
+      @if (data.ambiguousTypeInference && !defaultType()) {
+        <div class="insight" style="border-color: rgba(251, 113, 133, 0.45)">
+          <div class="insight-icon danger">?</div>
+          <div>
+            <div class="insight-title">Transaction type is ambiguous</div>
+            <p class="insight-text">
+              The file has no sign information, no type column and no debit/credit columns.
+              Choose the default treatment above and preview again.
+            </p>
+          </div>
+        </div>
+      }
+
+      <div>
+        <div class="section-title" style="margin-bottom: 10px">Column mapping</div>
+        <div class="mapping-grid">
+          @for (field of mappingFields; track field.key) {
+            <div class="field">
+              <label for="map-{{ field.key }}">{{ field.label }}</label>
+              <select
+                id="map-{{ field.key }}"
+                class="select"
+                [value]="mapping()?.[field.key] ?? ''"
+                (change)="updateMapping(field.key, $any($event.target).value)"
+              >
+                <option value="">Not mapped</option>
+                @for (header of data.headers; track $index) {
+                  <option [value]="$index">{{ header || ('Column ' + ($index + 1)) }}</option>
+                }
+              </select>
+            </div>
+          }
+        </div>
+        <div class="row" style="margin-top: 12px">
+          <button class="btn btn-sm" type="button" [disabled]="previewing()" (click)="rePreview()">
+            {{ previewing() ? 'Re-checking…' : 'Re-check with this mapping' }}
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-title" style="margin-bottom: 10px">First rows</div>
+        <div class="table-wrapper">
+          <table class="data-table preview-row">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th>Account</th>
+                <th class="num">Amount</th>
+                <th>Type</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of data.rows; track row.lineNumber) {
+                <tr>
+                  <td class="text-faint">{{ row.lineNumber }}</td>
+                  <td><span class="tag {{ rowStatus(row.status) === 'valid' ? 'ok' : rowStatus(row.status) === 'invalid' ? 'danger' : 'warning' }}">{{ rowStatusLabel(row.status) }}</span></td>
+                  <td class="text-muted" style="white-space: nowrap">{{ formatRowDate(row) }}</td>
+                  <td>{{ row.description ?? '—' }}</td>
+                  <td>{{ row.categoryName ?? '—' }}</td>
+                  <td>{{ row.accountName ?? '—' }}</td>
+                  <td class="num">{{ row.amount != null ? row.amount.toFixed(2) : (row.debitAmount ?? row.creditAmount ?? '—') }}</td>
+                  <td>
+                    @if (row.type) {
+                      <span class="tag {{ row.type === 'Income' ? 'income' : 'expense' }}">{{ row.type }}</span>
+                    } @else {
+                      <span class="text-faint">—</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      @if (data.errors.length) {
+        <div>
+          <div class="section-title" style="margin-bottom: 10px">
+            Rejected rows ({{ data.errors.length }} shown)
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table preview-row">
+              <thead>
+                <tr>
+                  <th>Row</th>
+                  <th>Problems</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (error of data.errors; track error.lineNumber) {
+                  <tr>
+                    <td class="text-faint">{{ error.lineNumber }}</td>
+                    <td class="text-expense">{{ error.errors.join(' · ') }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      @if (data.duplicateGroups.length) {
+        <div>
+          <div class="section-title" style="margin-bottom: 10px">
+            Possible duplicates ({{ data.duplicateGroups.length }} group(s))
+          </div>
+          <div class="insight-list">
+            @for (group of data.duplicateGroups; track group.key) {
+              <div class="insight">
+                <div class="insight-icon warning">≈</div>
+                <div>
+                  <div class="insight-title">{{ group.key }}</div>
+                  <p class="insight-text">
+                    Rows {{ group.fileLineNumbers.join(', ') }}
+                    @if (group.existingMatches > 0) {
+                      · matches {{ group.existingMatches }} transaction(s) already in the database
+                    }
+                  </p>
+                </div>
+              </div>
+            }
+          </div>
+          <label class="row" style="margin-top: 10px; cursor: pointer">
+            <input type="checkbox" [checked]="importDuplicates()" (change)="importDuplicates.set($any($event.target).checked)" />
+            <span>Import possible duplicates anyway</span>
+          </label>
+        </div>
+      }
+
+      <div class="row between" style="border-top: 1px solid var(--border); padding-top: 16px">
+        <button class="btn btn-ghost" type="button" (click)="step.set('select')">Back to options</button>
+        <div class="row">
+          <button class="btn" type="button" (click)="cancelImport()">Cancel</button>
+          <button
+            class="btn btn-primary"
+            type="button"
+            [disabled]="importing() || data.summary.validRows === 0 || (data.ambiguousTypeInference && !defaultType())"
+            (click)="confirmImport()"
+          >
+            {{ importing() ? 'Importing…' : 'Import ' + data.summary.validRows + ' transaction(s)' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (step() === 'result' && result(); as result) {
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Import finished</div>
+        <div class="card-subtitle">{{ result.fileName }}</div>
+      </div>
+    </div>
+    <div class="card-body col">
+      <div class="stat-inline">
+        <div>
+          <div class="stat-label">Rows read</div>
+          <div class="stat-value">{{ result.totalRows }}</div>
+        </div>
+        <div>
+          <div class="stat-label">Imported</div>
+          <div class="stat-value text-income">{{ result.importedRows }}</div>
+        </div>
+        <div>
+          <div class="stat-label">Duplicates skipped</div>
+          <div class="stat-value" style="color: var(--amber)">{{ result.duplicateRows }}</div>
+        </div>
+        <div>
+          <div class="stat-label">Rejected</div>
+          <div class="stat-value text-expense">{{ result.rejectedRows }}</div>
+        </div>
+      </div>
+
+      @if (result.createdCategories.length) {
+        <p class="text-muted" style="font-size: 13px">
+          Categories created: {{ result.createdCategories.join(', ') }}
+        </p>
+      }
+      @if (result.createdAccounts.length) {
+        <p class="text-muted" style="font-size: 13px">
+          Accounts created: {{ result.createdAccounts.join(', ') }}
+        </p>
+      }
+
+      @if (result.warnings.length) {
+        <div class="insight">
+          <div class="insight-icon warning">!</div>
+          <div>
+            <div class="insight-title">Warnings</div>
+            <ul class="insight-text" style="margin: 6px 0 0; padding-left: 18px">
+              @for (warning of result.warnings; track warning) {
+                <li>{{ warning }}</li>
+              }
+            </ul>
+          </div>
+        </div>
+      }
+
+      @if (result.rejectedRowsDetail.length) {
+        <div>
+          <div class="section-title" style="margin-bottom: 10px">Rejected rows</div>
+          <div class="table-wrapper">
+            <table class="data-table preview-row">
+              <thead>
+                <tr>
+                  <th>Row</th>
+                  <th>Problems</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (error of result.rejectedRowsDetail; track error.lineNumber) {
+                  <tr>
+                    <td class="text-faint">{{ error.lineNumber }}</td>
+                    <td class="text-expense">{{ error.errors.join(' · ') }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      <div class="row">
+        <a class="btn btn-primary" routerLink="/transactions">View transactions</a>
+        <a class="btn" routerLink="/dashboard">Go to dashboard</a>
+        <button class="btn btn-ghost" type="button" (click)="startOver()">Import another file</button>
+      </div>
+    </div>
+  </div>
+}

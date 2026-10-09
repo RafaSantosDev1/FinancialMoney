@@ -1,0 +1,237 @@
+<div class="row between" style="margin-bottom: 4px">
+  <div>
+    <h2 style="font-size: 20px">Reports</h2>
+    <p class="text-faint" style="font-size: 13px">
+      Period comparison and detailed tables for {{ filters.label() }}
+    </p>
+  </div>
+</div>
+
+@if (loading()) {
+  <app-loading message="Preparing report…" />
+} @else if (!hasData()) {
+  <div class="card">
+    <app-empty-state
+      title="No data for this period"
+      message="Reports need at least one transaction in the selected filters."
+      actionLabel="Import CSV"
+      actionLink="/import"
+    />
+  </div>
+} @else {
+  @if (summary(); as data) {
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Period comparison</div>
+          <div class="card-subtitle">
+            {{ data.from }} to {{ data.to }} versus {{ data.previousPeriod.from }} to {{ data.previousPeriod.to }}
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        @if (!data.previousPeriod.hasComparison) {
+          <p class="text-muted">No data in the previous equivalent period, so no comparison can be shown.</p>
+        } @else {
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th class="num">Current</th>
+                  <th class="num">Previous</th>
+                  <th class="num">Change</th>
+                  <th class="num">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Income</td>
+                  <td class="num text-income">{{ formatCurrency(data.totalIncome) }}</td>
+                  <td class="num text-muted">{{ formatCurrency(data.previousPeriod.totalIncome) }}</td>
+                  <td class="num">
+                    <span class="delta {{ data.previousPeriod.incomeDelta.absoluteChange >= 0 ? 'good' : 'bad' }}">
+                      {{ formatCurrency(data.previousPeriod.incomeDelta.absoluteChange) }}
+                    </span>
+                  </td>
+                  <td class="num text-muted">{{ formatPercent(data.previousPeriod.incomeDelta.percentChange) }}</td>
+                </tr>
+                <tr>
+                  <td>Expenses</td>
+                  <td class="num text-expense">{{ formatCurrency(data.totalExpenses) }}</td>
+                  <td class="num text-muted">{{ formatCurrency(data.previousPeriod.totalExpenses) }}</td>
+                  <td class="num">
+                    <span class="delta {{ data.previousPeriod.expenseDelta.absoluteChange <= 0 ? 'good' : 'bad' }}">
+                      {{ formatCurrency(data.previousPeriod.expenseDelta.absoluteChange) }}
+                    </span>
+                  </td>
+                  <td class="num text-muted">{{ formatPercent(data.previousPeriod.expenseDelta.percentChange) }}</td>
+                </tr>
+                <tr>
+                  <td>Net balance</td>
+                  <td class="num">{{ formatCurrency(data.netBalance) }}</td>
+                  <td class="num text-muted">{{ formatCurrency(data.previousPeriod.netBalance) }}</td>
+                  <td class="num">
+                    <span class="delta {{ data.previousPeriod.balanceDelta.absoluteChange >= 0 ? 'good' : 'bad' }}">
+                      {{ formatCurrency(data.previousPeriod.balanceDelta.absoluteChange) }}
+                    </span>
+                  </td>
+                  <td class="num text-muted">{{ formatPercent(data.previousPeriod.balanceDelta.percentChange) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-faint" style="font-size: 12.5px; margin-top: 10px">
+            Lower expenses are shown as an improvement, lower income as a deterioration.
+          </p>
+        }
+      </div>
+    </div>
+  }
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Monthly evolution</div>
+          <div class="card-subtitle">Income, expenses and balance per month</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th class="num">Income</th>
+                <th class="num">Expenses</th>
+                <th class="num">Balance</th>
+                <th class="num">Tx</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (point of trends(); track point.year + '-' + point.month) {
+                <tr>
+                  <td>{{ point.label }}</td>
+                  <td class="num text-income">{{ formatCurrency(point.income) }}</td>
+                  <td class="num text-expense">{{ formatCurrency(point.expenses) }}</td>
+                  <td class="num" [class]="point.balance >= 0 ? 'text-income' : 'text-expense'">{{ formatCurrency(point.balance) }}</td>
+                  <td class="num text-muted">{{ point.transactionCount }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card chart-card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Net balance evolution</div>
+          <div class="card-subtitle">Savings (green) or deficits (red) per month</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <app-chart type="bar" [data]="balanceChart()" [options]="barOptions" ariaLabel="Net balance per month" />
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Spending by category</div>
+          <div class="card-subtitle">Full distribution for the period</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th class="num">Amount</th>
+                <th class="num">Share</th>
+                <th class="num">Tx</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of breakdown(); track item.categoryId) {
+                <tr>
+                  <td>
+                    <span class="tag"><span class="dot" [style.background]="item.color"></span>{{ item.categoryName }}</span>
+                  </td>
+                  <td class="num">{{ formatCurrency(item.amount) }}</td>
+                  <td class="num text-muted">{{ formatPercent(item.percentOfTotal, 1) }}</td>
+                  <td class="num text-muted">{{ item.transactionCount }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Largest expenses</div>
+          <div class="card-subtitle">Top 10 transactions</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th class="num">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (expense of topExpenses(); track expense.id) {
+                <tr>
+                  <td class="text-muted" style="white-space: nowrap">{{ formatDate(expense.date) }}</td>
+                  <td>{{ expense.description }}</td>
+                  <td><span class="tag"><span class="dot" [style.background]="expense.color"></span>{{ expense.categoryName }}</span></td>
+                  <td class="num text-expense">{{ formatCurrency(expense.amount) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Insights</div>
+        <div class="card-subtitle">Facts and patterns detected in this period</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="insight-list">
+        @for (insight of insights(); track insight.kind) {
+          <article class="insight">
+            <div class="insight-icon {{ severityLabels[insight.severity] }}">•</div>
+            <div>
+              <div class="insight-title">
+                {{ insight.title }}
+                @if (insight.isPattern) {
+                  <span class="tag pattern">possible pattern</span>
+                }
+              </div>
+              <p class="insight-text">{{ insight.description }}</p>
+            </div>
+          </article>
+        }
+      </div>
+    </div>
+  </div>
+}

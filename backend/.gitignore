@@ -1,0 +1,15 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.db
+*.sqlite
+
+## Secrets / local configuration
+appsettings.*.local.json
+.env
+
+## Test results
+TestResults/
